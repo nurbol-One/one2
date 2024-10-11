@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设备租赁情况记录</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: hsl(0, 6%, 85%); /* 浅灰色背景 */
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: #f4f2f2; /* 表格背景为白色 */
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-container {
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            background-color: #fff; /* 表单区域白色背景 */
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .form-container div {
+            flex: 1;
+            min-width: 150px;
+            margin-right: 10px;
+        }
+        .form-container button {
+            padding: 8px 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .form-container button:hover {
+            background-color: #45a049;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        .action-buttons button {
+            padding: 5px 10px;
+            background-color: #008CBA;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .action-buttons button:hover {
+            background-color: #005f6b;
+        }
+        .delete-button {
+            background-color: #f44336;
+        }
+        .delete-button:hover {
+            background-color: #e53935;
+        }
+        .save-button {
+            background-color: #4CAF50;
+        }
+        .save-button:hover {
+            background-color: #45a049;
+        }
+        .search-container {
+            margin-bottom: 20px;
+            background-color: #fff; /* 搜索框区域白色背景 */
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .search-container input {
+            width: 50%;
+            padding: 8px;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        .search-container button {
+            padding: 8px 12px;
+            background-color: #008CBA;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .search-container button:hover {
+            background-color: #005f6b;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>设备租赁情况记录</h1>
+
+    <!-- 搜索框 -->
+    <div class="search-container">
+        <label for="searchDeviceName">搜索设备名称:</label>
+        <input type="text" id="searchDeviceName" placeholder="输入设备名称">
+        <button onclick="searchRecord()">搜索</button>
+    </div>
+
+    <div class="form-container">
+        <div><label for="customerName">客户名字:</label><input type="text" id="customerName" placeholder="输入客户名字"></div>
+        <div><label for="deviceName">设备名称:</label><input type="text" id="deviceName" placeholder="输入设备名称"></div>
+        <div><label for="siteName">前往工地名称:</label><input type="text" id="siteName" placeholder="输入工地名称"></div>
+        <div><label for="contractNumber">合同号:</label><input type="text" id="contractNumber" placeholder="输入合同号"></div>
+        <div><label for="rentalTime">租赁时间:</label><input type="date" id="rentalTime"></div>
+        <div><label for="endDate">截止日期:</label><input type="date" id="endDate"></div>
+        <div><label for="price">价格:</label><input type="number" id="price" placeholder="输入价格"></div>
+        <div><label for="freight">运费:</label><input type="number" id="freight" placeholder="输入运费"></div>
+        <div><label for="stopTime">停工时间:</label><input type="number" id="stopTime" placeholder="输入停工时间（天）"></div>
+        <div><label for="stopReason">停工原因:</label><textarea id="stopReason" rows="3" placeholder="输入停工原因"></textarea></div>
+        <div><label for="notes">备注:</label><textarea id="notes" rows="3" placeholder="输入备注"></textarea></div>
+    </div>
+
+    <button onclick="addRecord()">添加记录</button>
+
+    <table id="recordsTable">
+        <thead>
+            <tr>
+                <th>客户名字</th>
+                <th>设备名称</th>
+                <th>前往工地名称</th>
+                <th>合同号</th>
+                <th>租赁时间</th>
+                <th>截止日期</th>
+                <th>价格</th>
+                <th>运费</th>
+                <th>停工时间</th>
+                <th>停工原因</th>
+                <th>备注</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- 记录将显示在这里 -->
+        </tbody>
+    </table>
+
+    <script>
+        // Firebase 配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyAnPUSJSDcCPnFOQMrgizDx-ZOP7abpU7A",
+            authDomain: "one2-9ec7e.firebaseapp.com",
+            projectId: "one2-9ec7e",
+            storageBucket: "one2-9ec7e.appspot.com",
+            messagingSenderId: "764873178168",
+            appId: "1:764873178168:web:aed19539f19c918322facd",
+            measurementId: "G-6C2NL4KJJ3"
+        };
+
+        // 初始化Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        window.onload = loadRecords; // 页面加载时加载记录
+
+        function loadRecords() {
+            const recordsRef = database.ref('rentalRecords');
+            recordsRef.on('value', (snapshot) => {
+                const records = snapshot.val() || [];
+                const tableBody = document.getElementById('recordsTable').getElementsByTagName('tbody')[0];
+                tableBody.innerHTML = ""; // 清空当前表格内容
+                for (const [index, record] of Object.entries(records)) {
+                    const newRow = tableBody.insertRow();
+                    Object.values(record).forEach((cellValue) => {
+                        newRow.insertCell().textContent = cellValue;
+                    });
+
+                    // 添加操作按钮
+                    const actionCell = newRow.insertCell();
+                    const actionDiv = document.createElement('div');
+                    actionDiv.className = "action-buttons";
+
+                    // 修改按钮
+                    const editButton = document.createElement('button');
+                    editButton.textContent = '修改';
+                    editButton.onclick = function() {
+                        enableEditing(newRow, index);
+                    };
+                    actionDiv.appendChild(editButton);
+
+                    // 删除按钮
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = '删除';
+                    deleteButton.className = 'delete-button';
+                    deleteButton.onclick = function() {
+                        if (confirm('确定要删除这条记录吗？')) {
+                            deleteRecord(newRow, index);
+                        }
+                    };
+                    actionDiv.appendChild(deleteButton);
+
+                    actionCell.appendChild(actionDiv);
+                }
+            });
+        }
+
+        function addRecord() {
+            // 获取表单值
+            const customerName = document.getElementById('customerName').value;
+            const deviceName = document.getElementById('deviceName').value;
+            const siteName = document.getElementById('siteName').value;
+            const contractNumber = document.getElementById('contractNumber').value;
+            const rentalTime = document.getElementById('rentalTime').value;
+            const endDate = document.getElementById('endDate').value;
+            const price = document.getElementById('price').value;
+            const freight = document.getElementById('freight').value;
+            const stopTime = document.getElementById('stopTime').value;
+            const stopReason = document.getElementById('stopReason').value;
+            const notes = document.getElementById('notes').value;
+
+            // 添加记录到Firebase
+            const newRecordRef = database.ref('rentalRecords').push();
+            newRecordRef.set({
+                customerName,
+                deviceName,
+                siteName,
+                contractNumber,
+                rentalTime,
+                endDate,
+                price,
+                freight,
+                stopTime,
+                stopReason,
+                notes
+            }).then(() => {
+                clearForm();
+                alert('记录添加成功！');
+            }).catch((error) => {
+                alert('添加记录失败: ' + error.message);
+            });
+        }
+
+        function deleteRecord(row, index) {
+            database.ref('rentalRecords/' + index).remove()
+                .then(() => {
+                    alert('记录已删除');
+                })
+                .catch((error) => {
+                    alert('删除记录失败: ' + error.message);
+                });
+        }
+
+        function enableEditing(row, index) {
+            const cells = row.cells;
+            const customerName = cells[0].textContent;
+            const deviceName = cells[1].textContent;
+            const siteName = cells[2].textContent;
+            const contractNumber = cells[3].textContent;
+            const rentalTime = cells[4].textContent;
+            const endDate = cells[5].textContent;
+            const price = cells[6].textContent;
+            const freight = cells[7].textContent;
+            const stopTime = cells[8].textContent;
+            const stopReason = cells[9].textContent;
+            const notes = cells[10].textContent;
+
+            // 填充表单
+            document.getElementById('customerName').value = customerName;
+            document.getElementById('deviceName').value = deviceName;
+            document.getElementById('siteName').value = siteName;
+            document.getElementById('contractNumber').value = contractNumber;
+            document.getElementById('rentalTime').value = rentalTime;
+            document.getElementById('endDate').value = endDate;
+            document.getElementById('price').value = price;
+            document.getElementById('freight').value = freight;
+            document.getElementById('stopTime').value = stopTime;
+            document.getElementById('stopReason').value = stopReason;
+            document.getElementById('notes').value = notes;
+
+            // 更新按钮逻辑
+            const addButton = document.querySelector('button[onclick="addRecord()"]');
+            addButton.textContent = '保存更改';
+            addButton.onclick = function() {
+                saveChanges(index);
+            };
+        }
+
+        function saveChanges(index) {
+            const customerName = document.getElementById('customerName').value;
+            const deviceName = document.getElementById('deviceName').value;
+            const siteName = document.getElementById('siteName').value;
+            const contractNumber = document.getElementById('contractNumber').value;
+            const rentalTime = document.getElementById('rentalTime').value;
+            const endDate = document.getElementById('endDate').value;
+            const price = document.getElementById('price').value;
+            const freight = document.getElementById('freight').value;
+            const stopTime = document.getElementById('stopTime').value;
+            const stopReason = document.getElementById('stopReason').value;
+            const notes = document.getElementById('notes').value;
+
+            // 更新Firebase记录
+            database.ref('rentalRecords/' + index).update({
+                customerName,
+                deviceName,
+                siteName,
+                contractNumber,
+                rentalTime,
+                endDate,
+                price,
+                freight,
+                stopTime,
+                stopReason,
+                notes
+            }).then(() => {
+                alert('记录已更新');
+                clearForm();
+                loadRecords(); // 重新加载记录
+            }).catch((error) => {
+                alert('更新记录失败: ' + error.message);
+            });
+        }
+
+        function clearForm() {
+            document.getElementById('customerName').value = '';
+            document.getElementById('deviceName').value = '';
+            document.getElementById('siteName').value = '';
+            document.getElementById('contractNumber').value = '';
+            document.getElementById('rentalTime').value = '';
+            document.getElementById('endDate').value = '';
+            document.getElementById('price').value = '';
+            document.getElementById('freight').value = '';
+            document.getElementById('stopTime').value = '';
+            document.getElementById('stopReason').value = '';
+            document.getElementById('notes').value = '';
+
+            // 恢复添加按钮
+            const addButton = document.querySelector('button[onclick="addRecord()"]');
+            addButton.textContent = '添加记录';
+            addButton.onclick = addRecord; // 恢复原始点击行为
+        }
+
+        function searchRecord() {
+            const searchValue = document.getElementById('searchDeviceName').value.toLowerCase();
+            const recordsRef = database.ref('rentalRecords');
+            recordsRef.once('value', (snapshot) => {
+                const records = snapshot.val() || [];
+                const tableBody = document.getElementById('recordsTable').getElementsByTagName('tbody')[0];
+                tableBody.innerHTML = ""; // 清空当前表格内容
+                for (const [index, record] of Object.entries(records)) {
+                    if (record.deviceName.toLowerCase().includes(searchValue)) {
+                        const newRow = tableBody.insertRow();
+                        Object.values(record).forEach((cellValue) => {
+                            newRow.insertCell().textContent = cellValue;
+                        });
+
+                        // 添加操作按钮
+                        const actionCell = newRow.insertCell();
+                        const actionDiv = document.createElement('div');
+                        actionDiv.className = "action-buttons";
+
+                        // 修改按钮
+                        const editButton = document.createElement('button');
+                        editButton.textContent = '修改';
+                        editButton.onclick = function() {
+                            enableEditing(newRow, index);
+                        };
+                        actionDiv.appendChild(editButton);
+
+                        // 删除按钮
+                        const deleteButton = document.createElement('button');
+                        deleteButton.textContent = '删除';
+                        deleteButton.className = 'delete-button';
+                        deleteButton.onclick = function() {
+                            if (confirm('确定要删除这条记录吗？')) {
+                                deleteRecord(newRow, index);
+                            }
+                        };
+                        actionDiv.appendChild(deleteButton);
+
+                        actionCell.appendChild(actionDiv);
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
